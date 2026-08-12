@@ -1,10 +1,6 @@
 from agents.project_agent import ProjectAgent
-from agents.resource_agent import ResourceAgent
-from agents.weather_agent import WeatherAgent
 
-project_agent = ProjectAgent()
-resource_agent = ResourceAgent()
-weather_agent = WeatherAgent()
+agent = ProjectAgent()
 
 sample_project = {
     "Project_Type": "Tunnel",
@@ -33,28 +29,4 @@ sample_project = {
     "Completion_Percentage": 95.01,
 }
 
-sample_equipment = {
-    "ProductType": "L12",
-    "Humidity": 65.0,
-    "Temperature": 28.0,
-    "Age": 5,
-    "Quantity": 40000,
-}
-
-sample_weather = {
-    "Precip Type": "rain",
-    "Temperature (C)": 18.0,
-    "Apparent Temperature (C)": 17.5,
-    "Humidity": 0.80,
-    "Wind Speed (km/h)": 15.0,
-    "Wind Bearing (degrees)": 200.0,
-    "Visibility (km)": 8.0,
-    "Pressure (millibars)": 1012.0,
-    "Hour": 14,
-    "Month": 8,
-    "Day_Of_Week": 2,
-}
-
-print("Predicted Project Risk:", project_agent.predict_risk(sample_project))
-print("Predicted Equipment MTTF:", resource_agent.predict_mttf(sample_equipment))
-print("Predicted Weather:", weather_agent.predict_weather(sample_weather))
+print("Predicted Risk:", agent.predict_risk(sample_project))
