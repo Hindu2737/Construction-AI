@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Trained ML models
+models/*.pkl
+models/*.pt
+models/*.pth
+
+# YOLO training outputs
+runs/
