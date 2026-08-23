@@ -30,3 +30,13 @@ sample_project = {
 }
 
 print("Predicted Risk:", agent.predict_risk(sample_project))
+from agents.safety_agent import SafetyAgent
+
+safety_agent = SafetyAgent()
+
+safety_report = safety_agent.inspect_image(
+    "datasets/contruction site safety image dataflow/css-data/test/images/000005_jpg.rf.96e9379ccae638140c4a90fc4b700a2b.jpg"
+)
+
+print("\nSafety Report:")
+print(safety_report)
