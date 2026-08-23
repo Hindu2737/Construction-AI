@@ -13,7 +13,7 @@ from agents.safety_intelligence_agent import SafetyIntelligenceAgent
 
 
 st.set_page_config(
-    page_title="Construction AI Safety Dashboard",
+    page_title="Agentic AI for Safety Monitoring with Construction Risk Analytics",
     page_icon="🏗️",
     layout="wide",
 )
@@ -41,7 +41,7 @@ def load_data():
 agents = load_agents()
 equipment_df, weather_df = load_data()
 
-st.title("🏗️ Construction AI: Site Risk & Safety Intelligence")
+st.title("🏗️ Agentic AI for Safety Monitoring with Construction Risk Analytics")
 st.write(
     "Predict project risk, equipment maintenance risk, weather conditions, "
     "and worker PPE violations from a construction-site image."
