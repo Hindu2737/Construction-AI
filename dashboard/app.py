@@ -201,3 +201,4 @@ if analyze_button:
 
     with st.expander("View all YOLO detections"):
         st.dataframe(pd.DataFrame(safety_report["detections"]))
+
