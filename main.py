@@ -6,7 +6,8 @@ from agents.weather_agent import WeatherAgent
 from agents.safety_agent import SafetyAgent
 from agents.site_risk_agent import SiteRiskAgent
 from agents.safety_intelligence_agent import SafetyIntelligenceAgent
-
+from agents.compliance_agent import ComplianceAgent
+from agents.insurance_agent import InsuranceIntelligenceAgent
 
 # Load all trained agents
 project_agent = ProjectAgent()
@@ -15,7 +16,8 @@ weather_agent = WeatherAgent()
 safety_agent = SafetyAgent()
 site_risk_agent = SiteRiskAgent()
 safety_intelligence_agent = SafetyIntelligenceAgent()
-
+compliance_agent = ComplianceAgent()
+insurance_agent = InsuranceIntelligenceAgent()
 
 # Project model input
 sample_project = {
@@ -89,6 +91,17 @@ site_report = site_risk_agent.assess_site(
     safety_report=safety_report,
 )
 
+compliance_report = compliance_agent.assess_compliance(
+    safety_report=safety_report,
+    worker_protection_report=worker_protection_report,
+)
+
+insurance_report = insurance_agent.assess_insurance_risk(
+    site_report=site_report,
+    compliance_report=compliance_report,
+    equipment_mttf=equipment_mttf,
+)
+
 
 print("\n--- SITE RISK MONITORING REPORT ---")
 print("Project Risk:", project_risk)
@@ -128,3 +141,25 @@ if worker_protection_report["recommended_actions"]:
         print("-", action)
 else:
     print("- Continue standard site-safety monitoring.")
+print("\n--- COMPLIANCE INTELLIGENCE ---")
+print("Compliance Status:", compliance_report["compliance_status"])
+print("Compliance Score:", compliance_report["compliance_score"], "/ 100")
+print("Evidence Items:", compliance_report["evidence_count"])
+
+if compliance_report["findings"]:
+    print("\nCompliance Findings:")
+    for finding in compliance_report["findings"]:
+        print(
+            f"- {finding['violation']} | "
+            f"Severity: {finding['severity']}"
+        )
+        print("  Requirement:", finding["requirement"])
+        print("  Action:", finding["action"])
+else:
+    print("No confirmed compliance violations found.")
+
+print("\n--- INSURANCE INTELLIGENCE ---")
+print("Insurance Risk Level:", insurance_report["insurance_risk_level"])
+print("Insurance Risk Score:", insurance_report["insurance_risk_score"], "/ 100")
+print("Recommendation:", insurance_report["recommendation"])
+print("Note:", insurance_report["note"])
