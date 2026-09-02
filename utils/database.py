@@ -1,0 +1,200 @@
+from pathlib import Path
+import json
+import sqlite3
+from uuid import uuid4
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATABASE_DIRECTORY = PROJECT_ROOT / "database"
+DATABASE_PATH = DATABASE_DIRECTORY / "construction_ai.db"
+IMAGE_DIRECTORY = DATABASE_DIRECTORY / "inspection_images"
+
+
+def get_connection():
+    """Create a SQLite connection with named columns enabled."""
+    DATABASE_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+
+    return connection
+
+
+def initialize_database():
+    """Create the inspection-history table if it does not exist."""
+    IMAGE_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
+    connection = get_connection()
+
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS inspections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            project_type TEXT,
+            location TEXT,
+            image_filename TEXT,
+            image_path TEXT,
+
+            project_risk TEXT,
+            equipment_mttf REAL,
+            weather_prediction TEXT,
+
+            site_risk_level TEXT,
+            site_risk_score INTEGER,
+
+            safety_status TEXT,
+            safety_score INTEGER,
+            workers_detected INTEGER,
+            ppe_violations TEXT,
+
+            compliance_status TEXT,
+            compliance_score INTEGER,
+
+            insurance_risk_level TEXT,
+            insurance_risk_score INTEGER,
+
+            hazards TEXT,
+            recommended_actions TEXT
+        )
+    """)
+
+    connection.execute("""
+        CREATE INDEX IF NOT EXISTS index_inspections_created_at
+        ON inspections(created_at DESC)
+    """)
+
+    connection.commit()
+    connection.close()
+
+
+def save_inspection(
+    project_data,
+    uploaded_image,
+    project_risk,
+    equipment_mttf,
+    weather_prediction,
+    safety_report,
+    worker_protection_report,
+    site_report,
+    compliance_report,
+    insurance_report,
+):
+    """
+    Save a completed site assessment and its uploaded image.
+    Returns the newly created inspection ID.
+    """
+    initialize_database()
+
+    original_filename = uploaded_image.name
+    file_extension = Path(original_filename).suffix.lower()
+
+    saved_image_name = (
+        f"inspection_{uuid4().hex}{file_extension}"
+    )
+
+    saved_image_path = IMAGE_DIRECTORY / saved_image_name
+
+    saved_image_path.write_bytes(uploaded_image.getvalue())
+
+    connection = get_connection()
+
+    cursor = connection.execute("""
+        INSERT INTO inspections (
+            project_type,
+            location,
+            image_filename,
+            image_path,
+
+            project_risk,
+            equipment_mttf,
+            weather_prediction,
+
+            site_risk_level,
+            site_risk_score,
+
+            safety_status,
+            safety_score,
+            workers_detected,
+            ppe_violations,
+
+            compliance_status,
+            compliance_score,
+
+            insurance_risk_level,
+            insurance_risk_score,
+
+            hazards,
+            recommended_actions
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        project_data["Project_Type"],
+        project_data["Location"],
+        original_filename,
+        str(saved_image_path),
+
+        project_risk,
+        float(equipment_mttf),
+        weather_prediction,
+
+        site_report["site_risk_level"],
+        int(site_report["site_risk_score"]),
+
+        safety_report["status"],
+        int(worker_protection_report["safety_score"]),
+        int(worker_protection_report["workers_detected"]),
+        json.dumps(
+            worker_protection_report["confirmed_violations"]
+        ),
+
+        compliance_report["compliance_status"],
+        int(compliance_report["compliance_score"]),
+
+        insurance_report["insurance_risk_level"],
+        int(insurance_report["insurance_risk_score"]),
+
+        json.dumps(site_report["hazards"]),
+        json.dumps(site_report["recommended_actions"]),
+    ))
+
+    inspection_id = cursor.lastrowid
+
+    connection.commit()
+    connection.close()
+
+    return inspection_id
+
+
+def get_recent_inspections(limit=20):
+    """Return the newest inspection records first."""
+    initialize_database()
+
+    connection = get_connection()
+
+    rows = connection.execute("""
+        SELECT *
+        FROM inspections
+        ORDER BY id DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
+
+
+def get_inspection_count():
+    """Return the total number of saved inspections."""
+    initialize_database()
+
+    connection = get_connection()
+
+    row = connection.execute("""
+        SELECT COUNT(*) AS total
+        FROM inspections
+    """).fetchone()
+
+    connection.close()
+
+    return row["total"]
