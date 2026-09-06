@@ -9,7 +9,7 @@ class SafetyAgent:
     }
 
     def __init__(self):
-       self.model = YOLO("runs/detect/models/safety_yolo-7/weights/best.pt")
+        self.model = YOLO("runs/detect/models/safety_yolo-2/weights/best.pt")
 
     def inspect_image(self, image_path):
         results = self.model(image_path, verbose=False)
