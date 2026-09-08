@@ -4,51 +4,105 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from utils.database import get_inspection_count, get_recent_inspections
+from utils.database import (
+    get_inspection_count,
+    get_recent_inspections,
+)
 
+
+# ============================================================
+# PAGE HEADER
+# ============================================================
+
+st.title(":material/history: Inspection history")
+
+st.caption(
+    "Review previously saved Construction-AI site assessments, "
+    "risk trends, compliance findings, and inspection images."
+)
+
+
+# ============================================================
+# HELPER
+# ============================================================
 
 def load_json_list(value):
     """Safely convert JSON database text into a Python list."""
+
     if not value:
         return []
 
     try:
-        return json.loads(value)
-    except json.JSONDecodeError:
+        result = json.loads(value)
+
+        if isinstance(result, list):
+            return result
+
+        return []
+
+    except (
+        json.JSONDecodeError,
+        TypeError,
+    ):
         return []
 
 
-st.title(":material/history: Inspection history")
-st.caption(
-    "Review previously saved Construction AI site assessments, "
-    "risk scores, compliance findings, and uploaded inspection images."
+# ============================================================
+# LOAD INSPECTIONS
+# ============================================================
+
+inspections = get_recent_inspections(
+    limit=200
 )
 
-inspections = get_recent_inspections(limit=200)
+
+# ============================================================
+# EMPTY DATABASE
+# ============================================================
 
 if not inspections:
+
     with st.container(border=True):
+
         st.info(
-            "No saved inspections yet. Go to **Site assessment**, upload "
-            "a construction-site image, and select **Analyze site safety**.",
+            "No saved inspections yet. Go to **Site assessment**, "
+            "upload a construction-site image, and select "
+            "**Analyze site safety**.",
             icon=":material/info:",
         )
 
     st.stop()
 
-inspections_df = pd.DataFrame(inspections)
 
-# Convert database timestamps into readable date/time values.
+# ============================================================
+# DATAFRAME
+# ============================================================
+
+inspections_df = pd.DataFrame(
+    inspections
+)
+
+
+# Convert timestamp
 inspections_df["created_at"] = pd.to_datetime(
     inspections_df["created_at"],
     errors="coerce",
 )
 
-# ---------------------------------------------------------
-# History overview metrics
-# ---------------------------------------------------------
+
+# Sort newest first
+inspections_df = inspections_df.sort_values(
+    "created_at",
+    ascending=False,
+)
+
+
+# ============================================================
+# OVERVIEW METRICS
+# ============================================================
 
 total_inspections = get_inspection_count()
+
 
 high_risk_count = len(
     inspections_df[
@@ -56,21 +110,29 @@ high_risk_count = len(
     ]
 )
 
+
 unsafe_count = len(
     inspections_df[
         inspections_df["safety_status"] == "Unsafe"
     ]
 )
 
+
 non_compliant_count = len(
     inspections_df[
-        inspections_df["compliance_status"] == "Non-Compliant"
+        inspections_df["compliance_status"]
+        == "Non-Compliant"
     ]
 )
 
-st.header(":material/analytics: Inspection overview")
+
+st.header(
+    ":material/analytics: Inspection overview"
+)
+
 
 with st.container(horizontal=True):
+
     st.metric(
         "Saved inspections",
         total_inspections,
@@ -96,27 +158,297 @@ with st.container(horizontal=True):
     )
 
 
-# ---------------------------------------------------------
-# Filters
-# ---------------------------------------------------------
+# ============================================================
+# HISTORICAL ANALYTICS
+# ============================================================
 
-st.header(":material/filter_list: Filter inspections")
+st.header(
+    ":material/monitoring: Risk analytics"
+)
 
-filter_left, filter_right, filter_third = st.columns(3)
+
+# ------------------------------------------------------------
+# Prepare analytics data
+# ------------------------------------------------------------
+
+analytics_df = inspections_df.copy()
+
+analytics_df["site_risk_score"] = pd.to_numeric(
+    analytics_df["site_risk_score"],
+    errors="coerce",
+)
+
+analytics_df["safety_score"] = pd.to_numeric(
+    analytics_df["safety_score"],
+    errors="coerce",
+)
+
+analytics_df["insurance_risk_score"] = pd.to_numeric(
+    analytics_df["insurance_risk_score"],
+    errors="coerce",
+)
+
+
+analytics_df = analytics_df.dropna(
+    subset=["created_at"]
+)
+
+analytics_df = analytics_df.sort_values(
+    "created_at"
+)
+
+
+# ------------------------------------------------------------
+# Average metrics
+# ------------------------------------------------------------
+
+avg_site_risk = analytics_df[
+    "site_risk_score"
+].mean()
+
+avg_safety_protection = analytics_df[
+    "safety_score"
+].mean()
+
+avg_insurance_risk = analytics_df[
+    "insurance_risk_score"
+].mean()
+
+
+metric1, metric2, metric3 = st.columns(3)
+
+
+with metric1:
+
+    if pd.notna(avg_site_risk):
+
+        st.metric(
+            "Average site risk",
+            f"{avg_site_risk:.1f}/100",
+        )
+
+    else:
+
+        st.metric(
+            "Average site risk",
+            "N/A",
+        )
+
+
+with metric2:
+
+    if pd.notna(avg_safety_protection):
+
+        st.metric(
+            "Average safety protection",
+            f"{avg_safety_protection:.1f}/100",
+        )
+
+    else:
+
+        st.metric(
+            "Average safety protection",
+            "N/A",
+        )
+
+
+with metric3:
+
+    if pd.notna(avg_insurance_risk):
+
+        st.metric(
+            "Average insurance risk",
+            f"{avg_insurance_risk:.1f}/100",
+        )
+
+    else:
+
+        st.metric(
+            "Average insurance risk",
+            "N/A",
+        )
+
+
+st.caption(
+    "Safety protection score is interpreted as higher-is-better. "
+    "Site and insurance scores are risk scores where higher "
+    "indicates greater risk."
+)
+
+
+# ============================================================
+# RISK TREND
+# ============================================================
+
+st.subheader(
+    ":material/trending_up: Risk trend"
+)
+
+
+if len(analytics_df) >= 1:
+
+    trend_df = analytics_df[
+        [
+            "created_at",
+            "site_risk_score",
+            "insurance_risk_score",
+        ]
+    ].copy()
+
+
+    trend_df = trend_df.set_index(
+        "created_at"
+    )
+
+
+    trend_df = trend_df.rename(
+        columns={
+            "site_risk_score": "Site Risk",
+            "insurance_risk_score": "Insurance Risk",
+        }
+    )
+
+
+    st.line_chart(
+        trend_df,
+        y=[
+            "Site Risk",
+            "Insurance Risk",
+        ],
+        height=320,
+    )
+
+else:
+
+    st.info(
+        "Not enough data to display risk trends."
+    )
+
+
+# ============================================================
+# SAFETY PROTECTION TREND
+# ============================================================
+
+st.subheader(
+    ":material/health_and_safety: Safety protection trend"
+)
+
+
+if len(analytics_df) >= 1:
+
+    safety_trend_df = analytics_df[
+        [
+            "created_at",
+            "safety_score",
+        ]
+    ].copy()
+
+
+    safety_trend_df = safety_trend_df.set_index(
+        "created_at"
+    )
+
+
+    safety_trend_df = safety_trend_df.rename(
+        columns={
+            "safety_score": "Safety Protection Score"
+        }
+    )
+
+
+    st.line_chart(
+        safety_trend_df,
+        y="Safety Protection Score",
+        height=280,
+    )
+
+else:
+
+    st.info(
+        "Not enough data to display safety trends."
+    )
+
+
+# ============================================================
+# COMPLIANCE DISTRIBUTION
+# ============================================================
+
+st.subheader(
+    ":material/gavel: Compliance distribution"
+)
+
+
+compliance_counts = (
+    inspections_df[
+        "compliance_status"
+    ]
+    .value_counts()
+)
+
+
+if not compliance_counts.empty:
+
+    compliance_chart = (
+        compliance_counts
+        .rename_axis("Compliance Status")
+        .to_frame("Inspections")
+    )
+
+
+    st.bar_chart(
+        compliance_chart,
+        y="Inspections",
+        height=280,
+    )
+
+else:
+
+    st.info(
+        "No compliance history is available."
+    )
+
+
+# ============================================================
+# FILTERS
+# ============================================================
+
+st.header(
+    ":material/filter_list: Filter inspections"
+)
+
+
+filter_left, filter_right, filter_third = st.columns(
+    3
+)
+
 
 with filter_left:
+
     risk_filter = st.selectbox(
         "Site-risk level",
-        options=["All", "Low", "Medium", "High"],
+        options=[
+            "All",
+            "Low",
+            "Medium",
+            "High",
+        ],
     )
+
 
 with filter_right:
+
     safety_filter = st.selectbox(
         "Safety status",
-        options=["All", "Safe", "Unsafe"],
+        options=[
+            "All",
+            "Safe",
+            "Unsafe",
+        ],
     )
 
+
 with filter_third:
+
     compliance_filter = st.selectbox(
         "Compliance status",
         options=[
@@ -127,209 +459,534 @@ with filter_third:
         ],
     )
 
+
+# ============================================================
+# APPLY FILTERS
+# ============================================================
+
 filtered_df = inspections_df.copy()
 
+
 if risk_filter != "All":
+
     filtered_df = filtered_df[
-        filtered_df["site_risk_level"] == risk_filter
+        filtered_df["site_risk_level"]
+        == risk_filter
     ]
+
 
 if safety_filter != "All":
+
     filtered_df = filtered_df[
-        filtered_df["safety_status"] == safety_filter
+        filtered_df["safety_status"]
+        == safety_filter
     ]
+
 
 if compliance_filter != "All":
+
     filtered_df = filtered_df[
-        filtered_df["compliance_status"] == compliance_filter
+        filtered_df["compliance_status"]
+        == compliance_filter
     ]
 
 
-# ---------------------------------------------------------
-# Inspection table
-# ---------------------------------------------------------
+# ============================================================
+# FILTER RESULT
+# ============================================================
 
-st.header(":material/table_chart: Saved inspection records")
-
-display_df = filtered_df[
-    [
-        "id",
-        "created_at",
-        "project_type",
-        "location",
-        "site_risk_level",
-        "site_risk_score",
-        "safety_status",
-        "compliance_status",
-        "insurance_risk_level",
-    ]
-].copy()
-
-display_df = display_df.rename(
-    columns={
-        "id": "Inspection ID",
-        "created_at": "Date and time",
-        "project_type": "Project type",
-        "location": "Location",
-        "site_risk_level": "Site risk",
-        "site_risk_score": "Risk score",
-        "safety_status": "Safety status",
-        "compliance_status": "Compliance status",
-        "insurance_risk_level": "Insurance risk",
-    }
-)
-
-st.dataframe(
-    display_df,
-    hide_index=True,
-    width="stretch",
-    column_config={
-        "Risk score": st.column_config.ProgressColumn(
-            "Risk score",
-            min_value=0,
-            max_value=100,
-            format="%d / 100",
-        ),
-        "Date and time": st.column_config.DatetimeColumn(
-            "Date and time",
-            format="DD MMM YYYY, HH:mm",
-        ),
-    },
+st.caption(
+    f"Showing {len(filtered_df)} inspection(s) "
+    f"matching the selected filters."
 )
 
 
-# ---------------------------------------------------------
-# Selected inspection detail view
-# ---------------------------------------------------------
+# ============================================================
+# INSPECTION TABLE
+# ============================================================
 
-st.header(":material/visibility: Inspection details")
+st.header(
+    ":material/table_chart: Saved inspection records"
+)
+
 
 if filtered_df.empty:
+
     st.warning(
         "No saved inspections match the selected filters.",
         icon=":material/filter_alt_off:",
     )
 
+else:
+
+    display_df = filtered_df[
+        [
+            "id",
+            "created_at",
+            "project_type",
+            "location",
+            "site_risk_level",
+            "site_risk_score",
+            "safety_status",
+            "compliance_status",
+            "insurance_risk_level",
+        ]
+    ].copy()
+
+
+    display_df = display_df.rename(
+        columns={
+            "id": "Inspection ID",
+            "created_at": "Date and time",
+            "project_type": "Project type",
+            "location": "Location",
+            "site_risk_level": "Site risk",
+            "site_risk_score": "Risk score",
+            "safety_status": "Safety status",
+            "compliance_status": "Compliance status",
+            "insurance_risk_level": "Insurance risk",
+        }
+    )
+
+
+    st.dataframe(
+        display_df,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Risk score": st.column_config.ProgressColumn(
+                "Risk score",
+                min_value=0,
+                max_value=100,
+                format="%d / 100",
+            ),
+            "Date and time": st.column_config.DatetimeColumn(
+                "Date and time",
+                format="DD MMM YYYY, HH:mm",
+            ),
+        },
+    )
+
+
+# ============================================================
+# INSPECTION DETAILS
+# ============================================================
+
+st.header(
+    ":material/visibility: Inspection details"
+)
+
+
+if filtered_df.empty:
+
+    st.info(
+        "Select different filters to view an inspection."
+    )
+
     st.stop()
 
-inspection_options = {
-    (
-        f"#{row['id']} • {row['project_type']} • "
-        f"{row['location']} • {row['created_at'].strftime('%d %b %Y, %H:%M')}"
-    ): row["id"]
-    for _, row in filtered_df.iterrows()
-}
+
+# ============================================================
+# INSPECTION SELECTOR
+# ============================================================
+
+inspection_options = {}
+
+
+for _, row in filtered_df.iterrows():
+
+    created_at = row["created_at"]
+
+    if pd.notna(created_at):
+
+        date_text = created_at.strftime(
+            "%d %b %Y, %H:%M"
+        )
+
+    else:
+
+        date_text = "Unknown date"
+
+
+    label = (
+        f"#{row['id']} • "
+        f"{row['project_type']} • "
+        f"{row['location']} • "
+        f"{date_text}"
+    )
+
+
+    inspection_options[label] = row["id"]
+
 
 selected_label = st.selectbox(
     "Select a saved inspection",
-    options=list(inspection_options.keys()),
+    options=list(
+        inspection_options.keys()
+    ),
 )
 
-selected_id = inspection_options[selected_label]
 
-selected_record = filtered_df[
+selected_id = inspection_options[
+    selected_label
+]
+
+
+selected_rows = filtered_df[
     filtered_df["id"] == selected_id
-].iloc[0].to_dict()
+]
+
+
+if selected_rows.empty:
+
+    st.error(
+        "Selected inspection could not be found."
+    )
+
+    st.stop()
+
+
+selected_record = (
+    selected_rows.iloc[0]
+    .to_dict()
+)
+
+
+# ============================================================
+# LOAD SAVED JSON DATA
+# ============================================================
 
 selected_hazards = load_json_list(
-    selected_record["hazards"]
+    selected_record.get(
+        "hazards"
+    )
 )
+
 
 selected_actions = load_json_list(
-    selected_record["recommended_actions"]
+    selected_record.get(
+        "recommended_actions"
+    )
 )
+
 
 selected_violations = load_json_list(
-    selected_record["ppe_violations"]
+    selected_record.get(
+        "ppe_violations"
+    )
 )
 
-detail_left, detail_right = st.columns([1.1, 1])
+
+# ============================================================
+# DETAILS
+# ============================================================
+
+detail_left, detail_right = st.columns(
+    [1.1, 1]
+)
+
+
+# ------------------------------------------------------------
+# Saved image
+# ------------------------------------------------------------
 
 with detail_left:
+
     with st.container(border=True):
-        st.subheader("Saved inspection image")
 
-        image_path = Path(selected_record["image_path"])
+        st.subheader(
+            "Saved inspection image"
+        )
 
-        if image_path.exists():
-            st.image(
-                str(image_path),
-                caption=selected_record["image_filename"],
-                width="stretch",
+
+        image_path_value = selected_record.get(
+            "image_path"
+        )
+
+
+        if image_path_value:
+
+            image_path = Path(
+                image_path_value
             )
+
+
+            if image_path.exists():
+
+                st.image(
+                    str(image_path),
+                    caption=selected_record.get(
+                        "image_filename",
+                        "Inspection image",
+                    ),
+                    width="stretch",
+                )
+
+            else:
+
+                st.warning(
+                    "The saved inspection image file "
+                    "could not be found.",
+                    icon=":material/image_not_supported:",
+                )
+
         else:
+
             st.warning(
-                "The saved inspection image file could not be found.",
-                icon=":material/image_not_supported:",
+                "No image path was saved for this inspection."
             )
+
+
+# ------------------------------------------------------------
+# Summary
+# ------------------------------------------------------------
 
 with detail_right:
+
     with st.container(border=True):
-        st.subheader("Risk and compliance summary")
+
+        st.subheader(
+            "Risk and compliance summary"
+        )
+
 
         st.metric(
             "Overall site risk",
-            selected_record["site_risk_level"],
+            selected_record.get(
+                "site_risk_level",
+                "Unknown",
+            ),
         )
+
 
         st.metric(
             "Site-risk score",
-            f"{selected_record['site_risk_score']} / 100",
+            f"{selected_record.get('site_risk_score', 0)} / 100",
         )
+
 
         st.metric(
             "Safety status",
-            selected_record["safety_status"],
+            selected_record.get(
+                "safety_status",
+                "Unknown",
+            ),
         )
+
+
+        st.metric(
+            "Safety protection score",
+            f"{selected_record.get('safety_score', 0)} / 100",
+        )
+
 
         st.metric(
             "Compliance status",
-            selected_record["compliance_status"],
+            selected_record.get(
+                "compliance_status",
+                "Unknown",
+            ),
         )
+
 
         st.metric(
             "Insurance risk",
-            selected_record["insurance_risk_level"],
+            selected_record.get(
+                "insurance_risk_level",
+                "Unknown",
+            ),
         )
+
+
+        equipment_value = selected_record.get(
+            "equipment_mttf",
+            0,
+        )
+
+
+        try:
+
+            equipment_value = float(
+                equipment_value
+            )
+
+            equipment_text = (
+                f"{equipment_value:.1f}"
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            equipment_text = "N/A"
+
 
         st.metric(
             "Equipment MTTF",
-            f"{selected_record['equipment_mttf']:.1f}",
+            equipment_text,
         )
 
 
-hazards_column, violations_column = st.columns(2)
+        st.write(
+            f"**Weather:** "
+            f"{selected_record.get('weather_prediction', 'Unknown')}"
+        )
+
+
+# ============================================================
+# HAZARDS & PPE
+# ============================================================
+
+hazards_column, violations_column = st.columns(
+    2
+)
+
 
 with hazards_column:
+
     with st.container(border=True):
-        st.subheader("Detected hazards")
+
+        st.subheader(
+            "Detected hazards"
+        )
+
 
         if selected_hazards:
+
             for hazard in selected_hazards:
-                st.write(f":material/warning: {hazard}")
+
+                st.warning(
+                    hazard,
+                    icon=":material/warning:",
+                )
+
         else:
-            st.success("No saved hazards for this inspection.")
+
+            st.success(
+                "No saved hazards for this inspection."
+            )
+
 
 with violations_column:
+
     with st.container(border=True):
-        st.subheader("Confirmed PPE violations")
+
+        st.subheader(
+            "Confirmed PPE violations"
+        )
+
 
         if selected_violations:
+
             for violation in selected_violations:
+
                 st.error(
                     violation,
                     icon=":material/report:",
                 )
-        else:
-            st.success("No confirmed PPE violations.")
 
+        else:
+
+            st.success(
+                "No confirmed PPE violations."
+            )
+
+
+# ============================================================
+# RECOMMENDED ACTIONS
+# ============================================================
 
 with st.container(border=True):
-    st.subheader("Recommended actions")
+
+    st.subheader(
+        "Recommended actions"
+    )
+
 
     if selected_actions:
-        for action in selected_actions:
-            st.write(f":material/check_circle: {action}")
+
+        for index, action in enumerate(
+            selected_actions,
+            start=1,
+        ):
+
+            st.write(
+                f":material/check_circle: "
+                f"**{index}.** {action}"
+            )
+
     else:
-        st.success("No actions were recorded for this inspection.")
-        
+
+        st.success(
+            "No actions were recorded for this inspection."
+        )
+
+
+# ============================================================
+# INSPECTION INFORMATION
+# ============================================================
+
+with st.container(border=True):
+
+    st.subheader(
+        "Inspection information"
+    )
+
+
+    info_col1, info_col2, info_col3 = st.columns(
+        3
+    )
+
+
+    with info_col1:
+
+        st.write(
+            f"**Inspection ID:** "
+            f"#{selected_record.get('id', 'N/A')}"
+        )
+
+        st.write(
+            f"**Project type:** "
+            f"{selected_record.get('project_type', 'N/A')}"
+        )
+
+
+    with info_col2:
+
+        st.write(
+            f"**Location:** "
+            f"{selected_record.get('location', 'N/A')}"
+        )
+
+        st.write(
+            f"**Project risk:** "
+            f"{selected_record.get('project_risk', 'N/A')}"
+        )
+
+
+    with info_col3:
+
+        st.write(
+            f"**Workers detected:** "
+            f"{selected_record.get('workers_detected', 0)}"
+        )
+
+        st.write(
+            f"**Insurance score:** "
+            f"{selected_record.get('insurance_risk_score', 0)} / 100"
+        )
+
+
+# ============================================================
+# REFRESH
+# ============================================================
+
+st.markdown("---")
+
+if st.button(
+    "🔄 Refresh inspection history",
+    use_container_width=True,
+):
+
+    st.rerun()

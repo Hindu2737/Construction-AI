@@ -14,6 +14,11 @@ st.session_state.setdefault("last_saved_inspection_id", None)
 page = st.navigation(
     [
         st.Page(
+            "app_pages/dashboard.py",
+            title="Executive Dashboard",
+            icon=":material/dashboard:",
+        ),
+        st.Page(
             "app_pages/site_assessment.py",
             title="Site assessment",
             icon=":material/health_and_safety:",

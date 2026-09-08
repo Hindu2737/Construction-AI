@@ -9,7 +9,11 @@ from agents.safety_intelligence_agent import SafetyIntelligenceAgent
 from agents.compliance_agent import ComplianceAgent
 from agents.insurance_agent import InsuranceIntelligenceAgent
 
-# Load all trained agents
+
+# ============================================================
+# LOAD ALL AGENTS
+# ============================================================
+
 project_agent = ProjectAgent()
 resource_agent = ResourceAgent()
 weather_agent = WeatherAgent()
@@ -19,7 +23,11 @@ safety_intelligence_agent = SafetyIntelligenceAgent()
 compliance_agent = ComplianceAgent()
 insurance_agent = InsuranceIntelligenceAgent()
 
-# Project model input
+
+# ============================================================
+# DEFAULT PROJECT INPUT
+# ============================================================
+
 sample_project = {
     "Project_Type": "Tunnel",
     "Location": "Houston",
@@ -48,118 +56,318 @@ sample_project = {
 }
 
 
-# Read valid equipment inputs from the processed dataset.
-sample_equipment = (
-    pd.read_csv("datasets/resource/resource_processed.csv")
-    .drop(columns=["MTTF"])
-    .iloc[0]
-    .to_dict()
-)
+# ============================================================
+# MAIN ANALYSIS FUNCTION
+# ============================================================
 
-# Read valid weather inputs from the processed dataset.
-sample_weather = (
-    pd.read_csv("datasets/weather/weather_processed.csv")
-    .drop(columns=["Summary"])
-    .iloc[0]
-    .to_dict()
-)
+def run_analysis(
+    project_data=None,
+    equipment_data=None,
+    weather_data=None,
+    image_path=None,
+):
+    """
+    Runs the complete Construction-AI intelligence pipeline.
 
-# Test image for Safety Agent.
-image_path = (
-    "datasets/contruction site safety image dataflow/"
-    "css-data/test/images/"
-    "000005_jpg.rf.96e9379ccae638140c4a90fc4b700a2b.jpg"
-)
+    Returns:
+        dict containing all agent outputs.
+    """
 
+    # --------------------------------------------------------
+    # Use default project data if none is provided
+    # --------------------------------------------------------
 
-# Run every trained model.
-project_risk = project_agent.predict_risk(sample_project)
-equipment_mttf = resource_agent.predict_mttf(sample_equipment)
-weather = weather_agent.predict_weather(sample_weather)
-safety_report = safety_agent.inspect_image(image_path)
-
-# Convert safety detections into worker-protection intelligence.
-worker_protection_report = (
-    safety_intelligence_agent.analyze_worker_protection(safety_report)
-)
-
-# Combine all four model outputs into overall site monitoring.
-site_report = site_risk_agent.assess_site(
-    project_risk=project_risk,
-    equipment_mttf=equipment_mttf,
-    weather=weather,
-    safety_report=safety_report,
-)
-
-compliance_report = compliance_agent.assess_compliance(
-    safety_report=safety_report,
-    worker_protection_report=worker_protection_report,
-)
-
-insurance_report = insurance_agent.assess_insurance_risk(
-    site_report=site_report,
-    compliance_report=compliance_report,
-    equipment_mttf=equipment_mttf,
-)
+    if project_data is None:
+        project_data = sample_project
 
 
-print("\n--- SITE RISK MONITORING REPORT ---")
-print("Project Risk:", project_risk)
-print("Equipment MTTF:", round(equipment_mttf, 2))
-print("Weather:", weather)
-print("Safety Status:", safety_report["status"])
-print("Overall Site Risk:", site_report["site_risk_level"])
-print("Risk Score:", site_report["site_risk_score"], "/ 100")
+    # --------------------------------------------------------
+    # Load equipment data
+    # --------------------------------------------------------
 
-print("\nHazards:")
-for hazard in site_report["hazards"]:
-    print("-", hazard)
+    if equipment_data is None:
 
-print("\nRecommended Actions:")
-for action in site_report["recommended_actions"]:
-    print("-", action)
-
-
-print("\n--- SAFETY INTELLIGENCE & WORKER PROTECTION ---")
-print(
-    "Protection Level:",
-    worker_protection_report["worker_protection_level"]
-)
-print("Safety Score:", worker_protection_report["safety_score"], "/ 100")
-print("Workers Detected:", worker_protection_report["workers_detected"])
-
-print("\nConfirmed PPE Violations:")
-if worker_protection_report["confirmed_violations"]:
-    for violation in worker_protection_report["confirmed_violations"]:
-        print("-", violation)
-else:
-    print("- No confirmed PPE violations.")
-
-print("\nWorker Protection Actions:")
-if worker_protection_report["recommended_actions"]:
-    for action in worker_protection_report["recommended_actions"]:
-        print("-", action)
-else:
-    print("- Continue standard site-safety monitoring.")
-print("\n--- COMPLIANCE INTELLIGENCE ---")
-print("Compliance Status:", compliance_report["compliance_status"])
-print("Compliance Score:", compliance_report["compliance_score"], "/ 100")
-print("Evidence Items:", compliance_report["evidence_count"])
-
-if compliance_report["findings"]:
-    print("\nCompliance Findings:")
-    for finding in compliance_report["findings"]:
-        print(
-            f"- {finding['violation']} | "
-            f"Severity: {finding['severity']}"
+        equipment_data = (
+            pd.read_csv(
+                "datasets/resource/resource_processed.csv"
+            )
+            .drop(columns=["MTTF"])
+            .iloc[0]
+            .to_dict()
         )
-        print("  Requirement:", finding["requirement"])
-        print("  Action:", finding["action"])
-else:
-    print("No confirmed compliance violations found.")
 
-print("\n--- INSURANCE INTELLIGENCE ---")
-print("Insurance Risk Level:", insurance_report["insurance_risk_level"])
-print("Insurance Risk Score:", insurance_report["insurance_risk_score"], "/ 100")
-print("Recommendation:", insurance_report["recommendation"])
-print("Note:", insurance_report["note"])                                                                                                                                                                                                                            
+
+    # --------------------------------------------------------
+    # Load weather data
+    # --------------------------------------------------------
+
+    if weather_data is None:
+
+        weather_data = (
+            pd.read_csv(
+                "datasets/weather/weather_processed.csv"
+            )
+            .drop(columns=["Summary"])
+            .iloc[0]
+            .to_dict()
+        )
+
+
+    # --------------------------------------------------------
+    # Default safety image
+    # --------------------------------------------------------
+
+    if image_path is None:
+
+        image_path = (
+            "datasets/contruction site safety image dataflow/"
+            "css-data/test/images/"
+            "000005_jpg.rf.96e9379ccae638140c4a90fc4b700a2b.jpg"
+        )
+
+
+    # ========================================================
+    # 1. PROJECT AGENT
+    # ========================================================
+
+    project_risk = project_agent.predict_risk(
+        project_data
+    )
+
+
+    # ========================================================
+    # 2. RESOURCE AGENT
+    # ========================================================
+
+    equipment_mttf = resource_agent.predict_mttf(
+        equipment_data
+    )
+
+
+    # ========================================================
+    # 3. WEATHER AGENT
+    # ========================================================
+
+    weather = weather_agent.predict_weather(
+        weather_data
+    )
+
+
+    # ========================================================
+    # 4. SAFETY / YOLO AGENT
+    # ========================================================
+
+    safety_report = safety_agent.inspect_image(
+        image_path
+    )
+
+
+    # ========================================================
+    # 5. SAFETY INTELLIGENCE
+    # ========================================================
+
+    worker_protection_report = (
+        safety_intelligence_agent.analyze_worker_protection(
+            safety_report
+        )
+    )
+
+
+    # ========================================================
+    # 6. SITE RISK
+    # ========================================================
+
+    site_report = site_risk_agent.assess_site(
+        project_risk=project_risk,
+        equipment_mttf=equipment_mttf,
+        weather=weather,
+        safety_report=safety_report,
+    )
+
+
+    # ========================================================
+    # 7. COMPLIANCE
+    # ========================================================
+
+    compliance_report = (
+        compliance_agent.assess_compliance(
+            safety_report=safety_report,
+            worker_protection_report=worker_protection_report,
+        )
+    )
+
+
+    # ========================================================
+    # 8. INSURANCE INTELLIGENCE
+    # ========================================================
+
+    insurance_report = (
+        insurance_agent.assess_insurance_risk(
+            site_report=site_report,
+            compliance_report=compliance_report,
+            equipment_mttf=equipment_mttf,
+        )
+    )
+
+
+    # ========================================================
+    # RETURN EVERYTHING
+    # ========================================================
+
+    return {
+    "project_risk": project_risk,
+    "equipment_mttf": float(equipment_mttf),
+
+    # Keep the existing key used by site_assessment.py
+    "weather_prediction": weather,
+
+    # Also keep this for the new dashboard/reporting layer
+    "weather": weather,
+
+    "safety_report": safety_report,
+
+    "worker_protection_report":
+        worker_protection_report,
+
+    "site_report":
+        site_report,
+
+    "compliance_report":
+        compliance_report,
+
+    "insurance_report":
+        insurance_report,
+    }
+
+
+# ============================================================
+# TERMINAL TEST
+# ============================================================
+
+if __name__ == "__main__":
+
+    results = run_analysis()
+
+    print("\n========================================")
+    print("   CONSTRUCTION-AI ANALYSIS")
+    print("========================================")
+
+    print("\n--- PROJECT ---")
+    print(
+        "Project Risk:",
+        results["project_risk"]
+    )
+
+    print("\n--- RESOURCE ---")
+    print(
+        "Equipment MTTF:",
+        round(results["equipment_mttf"], 2)
+    )
+
+    print("\n--- WEATHER ---")
+    print(
+        "Weather:",
+        results["weather"]
+    )
+
+    print("\n--- SAFETY ---")
+
+    safety = results["safety_report"]
+
+    print(
+        "Safety Status:",
+        safety["status"]
+    )
+
+    print(
+        "Detections:",
+        len(safety["detections"])
+    )
+
+    print(
+        "Violations:",
+        len(safety["violations"])
+    )
+
+    print("\n--- WORKER PROTECTION ---")
+
+    protection = results[
+        "worker_protection_report"
+    ]
+
+    print(
+        "Protection Level:",
+        protection["worker_protection_level"]
+    )
+
+    print(
+        "Safety Score:",
+        protection["safety_score"],
+        "/ 100"
+    )
+
+    print(
+        "Workers Detected:",
+        protection["workers_detected"]
+    )
+
+    print("\n--- SITE RISK ---")
+
+    site = results["site_report"]
+
+    print(
+        "Site Risk:",
+        site["site_risk_level"]
+    )
+
+    print(
+        "Site Risk Score:",
+        site["site_risk_score"],
+        "/ 100"
+    )
+
+    print("\nHazards:")
+
+    for hazard in site["hazards"]:
+        print("-", hazard)
+
+
+    print("\n--- COMPLIANCE ---")
+
+    compliance = results[
+        "compliance_report"
+    ]
+
+    print(
+        "Compliance:",
+        compliance["compliance_status"]
+    )
+
+    print(
+        "Compliance Score:",
+        compliance["compliance_score"],
+        "/ 100"
+    )
+
+
+    print("\n--- INSURANCE ---")
+
+    insurance = results[
+        "insurance_report"
+    ]
+
+    print(
+        "Insurance Risk:",
+        insurance["insurance_risk_level"]
+    )
+
+    print(
+        "Insurance Score:",
+        insurance["insurance_risk_score"],
+        "/ 100"
+    )
+
+    print(
+        "Recommendation:",
+        insurance["recommendation"]
+    )
