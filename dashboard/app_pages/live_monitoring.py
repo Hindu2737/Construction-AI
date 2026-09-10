@@ -369,8 +369,8 @@ webrtc_streamer(
 
     video_html_attrs={
         "style": {
-            "width": "600px",
-            "height": "400px",
+            "width": "800px",
+            "height": "600px",
             "object-fit": "contain",
             "margin": "0 auto",
             "display": "block",
